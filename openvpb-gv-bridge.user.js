@@ -1,18 +1,6 @@
 // ==UserScript==
 // @name         OpenVPB -> Google Voice (bridge + Enter-to-Call + E-to-End + daily counter)
 // @namespace    codex-helper
-// @version      2.5.1
-// @description  OpenVPB dial helper with daily counter. Reuses one Voice tab, Enter confirms Call, E ends call.
-// @match        https://www.openvpb.com/VirtualPhoneBank/LoggedIn/*
-// @match        https://voice.google.com/*
-// @run-at       document-end
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_addValueChangeListener
-// ==/UserScript==
-// ==UserScript==
-// @name         OpenVPB -> Google Voice (bridge + Enter-to-Call + E-to-End + daily counter)
-// @namespace    codex-helper
 // @version      2.6.0
 // @description  OpenVPB dial helper with daily counter. Reuses one Voice tab, Enter confirms Call, E ends call. Updated for 2025 Google Voice web UI.
 // @match        https://www.openvpb.com/VirtualPhoneBank/LoggedIn/*
