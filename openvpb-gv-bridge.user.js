@@ -402,27 +402,22 @@
             box.id = "vpb-gv-box";
             box.style.cssText = [
                 "position:fixed",
-                "left:50%",
-                "top:16px",
-                "transform:translateX(-50%)",
+                "left:12px",
+                "top:12px",
                 "z-index:999999",
                 "background:rgba(255,255,255,0.82)",
                 "backdrop-filter:blur(4px)",
                 "color:#111827",
-                "border:2px solid #111827",
-                "padding:10px 12px",
+                "border:1px solid #cbd5e1",
+                "padding:8px 10px",
                 "border-radius:10px",
                 "font:13px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
-                "box-shadow:0 8px 22px rgba(0,0,0,.15)",
-                "min-width:300px"
+                "box-shadow:0 4px 14px rgba(0,0,0,.12)",
+                "max-width:260px"
             ].join(";");
 
             box.innerHTML =
-                '<div id="vpb-gv-name" style="font-weight:600;margin-bottom:4px">No contact</div>' +
-                '<div id="vpb-gv-phone" style="opacity:.9;margin-bottom:6px">-</div>' +
-                '<div id="vpb-gv-count" style="opacity:.9;margin-bottom:4px">Calls today: 0</div>' +
-                '<div id="vpb-gv-voice" style="opacity:.9;margin-bottom:8px">Voice: checking...</div>' +
-                '<div id="vpb-gv-status" style="opacity:.75;margin-bottom:8px">Ready</div>' +
+                '<div id="vpb-gv-count" style="opacity:.9;margin-bottom:6px">Calls today: 0</div>' +
                 '<button id="vpb-gv-dial" style="border:1px solid #111827;background:#2563eb;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer">Dial in Google Voice (D)</button>' +
                 '<div id="vpb-gv-keys" style="margin-top:8px;font-size:11px;line-height:1.5;opacity:.8;border-top:1px solid #d1d5db;padding-top:6px">' +
                 '<b>Keys</b> &mdash; D dial &middot; S save &amp; next &middot; I couldn\'t reach &middot; X cancel &middot; V volunteer<br>' +
