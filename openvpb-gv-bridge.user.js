@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         OpenVPB -> Google Voice (bridge + Enter-to-Call + E-to-End + daily counter)
+// @name         OpenVPB -> Google Voice (bridge + Enter-to-Call + E-to-End + daily counter + survey hotkeys)
 // @namespace    codex-helper
-// @version      2.6.0
-// @description  OpenVPB dial helper with daily counter. Reuses one Voice tab, Enter confirms Call, E ends call. Updated for 2025 Google Voice web UI.
+// @version      2.7.0
+// @description  OpenVPB dial helper with daily counter. Reuses one Voice tab, Enter confirms Call, E ends call. Keyboard shortcuts for survey dropdowns, volunteer checkbox, disposition radios, and Save/Cancel. Updated for 2025 Google Voice web UI.
 // @match        https://www.openvpb.com/VirtualPhoneBank/LoggedIn/*
 // @match        https://voice.google.com/*
 // @run-at       document-end
@@ -423,7 +423,13 @@
                 '<div id="vpb-gv-count" style="opacity:.9;margin-bottom:4px">Calls today: 0</div>' +
                 '<div id="vpb-gv-voice" style="opacity:.9;margin-bottom:8px">Voice: checking...</div>' +
                 '<div id="vpb-gv-status" style="opacity:.75;margin-bottom:8px">Ready</div>' +
-                '<button id="vpb-gv-dial" style="border:1px solid #111827;background:#2563eb;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer">Dial in Google Voice (D)</button>';
+                '<button id="vpb-gv-dial" style="border:1px solid #111827;background:#2563eb;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer">Dial in Google Voice (D)</button>' +
+                '<div id="vpb-gv-keys" style="margin-top:8px;font-size:11px;line-height:1.5;opacity:.8;border-top:1px solid #d1d5db;padding-top:6px">' +
+                '<b>Keys</b> &mdash; D dial &middot; S save &amp; next &middot; I couldn\'t reach &middot; X cancel &middot; V volunteer<br>' +
+                'Heard? &nbsp;Y yes / N no / U unsure<br>' +
+                'Vote &nbsp;1&ndash;5 (Strong &rarr; Strong Against)<br>' +
+                'Couldn\'t reach: 1 Not Home &middot; 2 Refused &middot; 3 Deceased &middot; 4 Moved &middot; 5 Call Back &middot; 6 Busy &middot; 7 Left Msg &middot; 8 Wrong # &middot; 9 Disconnected' +
+                '</div>';
 
             document.body.appendChild(box);
             document.getElementById("vpb-gv-dial").addEventListener("click", () => dial());
@@ -481,11 +487,195 @@
             attributeFilter: ["href"]
         });
 
+        // ---- Keyboard control of the survey controls ----
+        // Edit the labels/keys below if the campaign questions or options change.
+        // Option text is matched case-insensitively (exact first, then substring).
+        const SURVEY = {
+            q1: {
+                question: "Have you heard of Alex Bores",
+                keys: { y: "Yes", n: "No", u: "Unsure" }
+            },
+            q2: {
+                question: "Can we count on you to vote",
+                keys: {
+                    "1": "1 (Strong)",
+                    "2": "2 (Somewhat)",
+                    "3": "3 (Undecided)",
+                    "4": "4 (Somewhat Against)",
+                    "5": "5 (Strong Against)"
+                }
+            },
+            volunteer: { key: "v", label: "Volunteer" },
+            reach: {
+                enterKey: "i",
+                enterButton: "I Couldn't Reach", // substring match ignores the contact name
+                cancelKey: "x",
+                cancelButton: "Cancel",
+                keys: {
+                    "1": "Not Home",
+                    "2": "Refused",
+                    "3": "Deceased",
+                    "4": "Moved",
+                    "5": "Call Back",
+                    "6": "Busy",
+                    "7": "Left Message",
+                    "8": "Wrong Number",
+                    "9": "Disconnected"
+                }
+            },
+            save: { key: "s", button: "Save & Next Call" }
+        };
+
+        function isVisibleEl(el) {
+            return !!el && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+        }
+
+        // Find the survey <select> associated with a question by locating the
+        // smallest element containing the question text, then the first select after it.
+        function findSelectForQuestion(questionSubstr) {
+            const lower = questionSubstr.trim().toLowerCase();
+            let label = null;
+            const all = document.querySelectorAll("label, span, div, p, h1, h2, h3, h4");
+            for (const el of all) {
+                const txt = (el.textContent || "").trim().toLowerCase();
+                if (txt.includes(lower)) {
+                    if (!label || el.textContent.length < label.textContent.length) label = el;
+                }
+            }
+            if (!label) return null;
+            const selects = Array.from(document.querySelectorAll("select")).filter(isVisibleEl);
+            for (const s of selects) {
+                if (label.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) return s;
+            }
+            return selects[0] || null;
+        }
+
+        // React-controlled <select>: must use the native value setter, then fire input+change.
+        function setNativeSelectValue(select, value) {
+            try {
+                const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value");
+                if (desc && desc.set) desc.set.call(select, value);
+                else select.value = value;
+            } catch (_e) {
+                select.value = value;
+            }
+            select.dispatchEvent(new Event("input", { bubbles: true }));
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        function setSelect(questionSubstr, optionText) {
+            const sel = findSelectForQuestion(questionSubstr);
+            if (!sel) return false;
+            const target = optionText.trim().toLowerCase();
+            const opts = Array.from(sel.options);
+            const match =
+                opts.find(o => (o.textContent || "").trim().toLowerCase() === target) ||
+                opts.find(o => (o.textContent || "").trim().toLowerCase().includes(target));
+            if (!match) return false;
+            setNativeSelectValue(sel, match.value);
+            return true;
+        }
+
+        function labelTextForInput(input) {
+            let txt = "";
+            if (input.id) {
+                const l = document.querySelector('label[for="' + CSS.escape(input.id) + '"]');
+                if (l) txt += " " + l.textContent;
+            }
+            const wrap = input.closest("label");
+            if (wrap) txt += " " + wrap.textContent;
+            if (input.parentElement) txt += " " + input.parentElement.textContent;
+            return txt.trim().toLowerCase();
+        }
+
+        function clickInputByLabel(labelText, types) {
+            const lower = labelText.trim().toLowerCase();
+            const inputs = Array.from(document.querySelectorAll("input"))
+                .filter(i => types.includes(i.type) && isVisibleEl(i));
+            for (const i of inputs) {
+                if (labelTextForInput(i).includes(lower)) { i.click(); return true; }
+            }
+            return false;
+        }
+
+        function clickButton(text) {
+            const target = text.trim().toLowerCase();
+            const btns = Array.from(document.querySelectorAll("button, [role='button'], a"))
+                .filter(b => isVisibleEl(b) && !b.disabled && b.getAttribute("aria-disabled") !== "true");
+            const el =
+                btns.find(b => (b.textContent || "").trim().toLowerCase() === target) ||
+                btns.find(b => (b.textContent || "").trim().toLowerCase().includes(target));
+            if (!el) return false;
+            el.click();
+            return true;
+        }
+
+        // The disposition radios are only on screen in "couldn't reach" mode.
+        function reachModeActive() {
+            return Array.from(document.querySelectorAll("input[type='radio']")).some(isVisibleEl);
+        }
+
         window.addEventListener("keydown", (e) => {
             const tag = e.target?.tagName || "";
-            if (tag === "INPUT" || tag === "TEXTAREA" || e.ctrlKey || e.metaKey || e.altKey) return;
-            if (String(e.key || "").toLowerCase() === HOTKEY) dial();
-        });
+            if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            const key = e.key;
+            const lower = String(key || "").toLowerCase();
+
+            // Dial in Google Voice (existing)
+            if (lower === HOTKEY) { dial(); return; }
+
+            // Save & Next Call
+            if (lower === SURVEY.save.key) {
+                if (clickButton(SURVEY.save.button)) { e.preventDefault(); setStatus("Saved -> next call"); }
+                return;
+            }
+
+            // Enter "I Couldn't Reach" disposition mode
+            if (lower === SURVEY.reach.enterKey) {
+                if (clickButton(SURVEY.reach.enterButton)) { e.preventDefault(); setStatus("Couldn't reach"); }
+                return;
+            }
+
+            // Cancel (exit disposition mode)
+            if (lower === SURVEY.reach.cancelKey) {
+                if (clickButton(SURVEY.reach.cancelButton)) { e.preventDefault(); setStatus("Cancelled"); }
+                return;
+            }
+
+            // Volunteer checkbox
+            if (lower === SURVEY.volunteer.key) {
+                if (clickInputByLabel(SURVEY.volunteer.label, ["checkbox"])) {
+                    e.preventDefault(); setStatus("Toggled volunteer");
+                }
+                return;
+            }
+
+            // Digit keys: disposition radios (in reach mode) OR the Q2 vote scale
+            if (/^[1-9]$/.test(key)) {
+                if (reachModeActive()) {
+                    const label = SURVEY.reach.keys[key];
+                    if (label && clickInputByLabel(label, ["radio"])) {
+                        e.preventDefault(); setStatus("Result: " + label);
+                    }
+                } else {
+                    const opt = SURVEY.q2.keys[key];
+                    if (opt && setSelect(SURVEY.q2.question, opt)) {
+                        e.preventDefault(); setStatus("Vote: " + opt);
+                    }
+                }
+                return;
+            }
+
+            // Q1 "Have you heard" letter keys
+            if (SURVEY.q1.keys[lower]) {
+                if (setSelect(SURVEY.q1.question, SURVEY.q1.keys[lower])) {
+                    e.preventDefault(); setStatus("Heard: " + SURVEY.q1.keys[lower]);
+                }
+                return;
+            }
+        }, true);
 
         setInterval(refreshVoiceState, 1500);
         refreshVoiceState();
